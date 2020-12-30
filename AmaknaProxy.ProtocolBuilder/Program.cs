@@ -71,8 +71,8 @@ namespace AmaknaProxy.ProtocolBuilder
                     Configuration.XmlTypesProfile,
                     Configuration.MessagesProfile,
                     Configuration.TypesProfile,
-                    //Configuration.DatacenterProfile,
-                    //Configuration.EnumsProfile,
+                    Configuration.DatacenterProfile,
+                    Configuration.EnumsProfile,
                 };
 
             foreach (ParsingProfile parsingProfile in profiles)
