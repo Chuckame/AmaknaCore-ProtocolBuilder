@@ -1,6 +1,7 @@
 ﻿<#@ template language="C#" debug="true"  #>
-<#@ output extension=".cs" #>
+<#@ output extension=".java" #>
 <#@ assembly name="System.dll" #>
+<#@ assembly name="$(TargetPath)" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Collections.Generic" #>
@@ -8,103 +9,45 @@
 <#@ parameter name="Message" type="ProtocolBuilder.XmlPatterns.XmlMessage" #>
 <#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
-// Generated on <#= DateTime.Now #>
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using <#=Program.Configuration.BaseNamespace + ".Types" #>;
-using AmaknaProxy.API.IO;
-using AmaknaProxy.API.Network;
+package <#= Profile.OutPutNamespace #>.<#= Message.RelativePath #>;
 
-namespace <#= Profile.OutPutNamespace #>
-{
+<# WriteNecessaryImports(Message); #>
+import fr.chuckame.dofus.io.*;
+import lombok.*;
+
+<# WriteLombokAnnotations(Message); #>
+<# WriteGeneratedAnnotation(); #>
+public class <#= Message.Name #> <#= HasHeritage(Message) ? "extends " + GetMessageFullName(Message.Heritage) : "implements NetworkMessage" #> {
 <# PushIndent("    "); #>
-public class <#= Message.Name #><#= !string.IsNullOrEmpty(Message.Heritage) && Message.Heritage != "Message" ? " : " + Message.Heritage : " : NetworkMessage" #>
-{
-<# PushIndent("    "); #>
-public const uint Id = <#= Message.Id #>;
-public override uint MessageId
-{
-    get { return Id; }
-}
+public static final int PROTOCOL_ID = <#= Message.Id #>;
 
 <#
-foreach (var field in Message.Fields)
-{
-    WriteField(field);
-} 
-#>
-
-public <#= Message.Name #>()
-{
-}
-
-<#
-    var baseFields = GetHierarchyFields(Message);
-
-    if (Message.Fields.Length + baseFields.Length > 0)
-    {
-        Write("public " + Message.Name + "(");
-
-        if (baseFields.Length > 0)
-        {
-            Write(string.Join(", ", baseFields.Select(field => GetRealType(field.Type) + " " + field.Name)));
-
-            if (Message.Fields.Length > 0)
-                Write(", ");
-        }
-        
-        if (Message.Fields.Length > 0)
-        {
-            Write(string.Join(", ", Message.Fields.Select(field => GetRealType(field.Type) + " " + field.Name)));
-        }
-
-        WriteLine(")");
-        if (baseFields.Length > 0)
-            WriteLine(" : base(" + string.Join(", ", baseFields.Select(field => field.Name)) + ")");
-        WriteLine("{");
-        PushIndent("    ");
-
-        foreach (var field in Message.Fields)
-        {
-            WriteLine("this." + field.Name + " = " + field.Name + ";");
-        }
-
-        PopIndent();
-        WriteLine("}");
+    foreach (var field in Message.Fields) {
+        WriteField(field);
     }
 #>
 
-public override void Serialize(IDataWriter writer)
-{
-<# PushIndent("    "); #>
+@Override
+public int getProtocolId() {
+    return PROTOCOL_ID;
+}
+
+@Override
+public void serialize(DataWriter writer) {
 <#
-    if (Message.Heritage != "Message")
-    {
-        WriteLine("base.Serialize(writer);");
-    }
-
-    WriteIOMethodStatements(Message.Fields, true);
+    PushIndent("    ");
+    WriteSerializeMethodStatements(Message);
+    PopIndent();
 #>
-<# PopIndent(); #>
 }
 
-public override void Deserialize(IDataReader reader)
-{
-<# PushIndent("    "); #>
+@Override
+public void deserialize(DataReader reader) {
 <#
-    if (Message.Heritage != "Message")
-    {
-        WriteLine("base.Deserialize(reader);");
-    }
-
-    WriteIOMethodStatements(Message.Fields, false);
+    PushIndent("    ");
+    WriteDeserializeMethodStatements(Message);
+    PopIndent();
 #>
-<# PopIndent(); #>
 }
-
-<# PopIndent(); #>
-}
-
 <# PopIndent(); #>
 }

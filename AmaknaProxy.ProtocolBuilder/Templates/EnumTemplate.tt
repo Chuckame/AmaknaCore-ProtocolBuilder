@@ -1,33 +1,52 @@
-﻿<#@ template language="C#" debug="true"  #>
-<#@ output extension=".cs" #>
+<#@ template language="C#" debug="true"  #>
+<#@ output extension=".java" #>
 <#@ assembly name="System.dll" #>
+<#@ assembly name="$(TargetPath)" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="ProtocolBuilder.Parsing" #>
 <#@ parameter name="Parser" type="ProtocolBuilder.Parsing.Parser" #>
 <#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
-// Generated on <#= DateTime.Now #>
-using System;
-using System.Collections.Generic;
+package <#= Profile.OutPutNamespace #>;
 
-namespace <#= Profile.OutPutNamespace #>
-{
-<# PushIndent("    "); #>
-public enum <#= Parser.Class.Name #>
-{
-<# PushIndent("    "); #>
+import java.util.Optional;
+import lombok.*;
+
+@RequiredArgsConstructor
+<# WriteGeneratedAnnotation(); #>
+public enum <#= Parser.Class.Name #> {
 <#
-foreach (var field in Parser.Fields)
-{
-    Write(field.Name);
-    Write(" = ");
-    Write(field.Value);
-    Write(",");
-    WriteLine("");
-} 
+    PushIndent("    ");
+    for (int i = 0; i < Parser.Fields.Count; i++)
+    {
+        var field = Parser.Fields[i];
+        Write($"{field.Name}({field.Value})");
+        if (i < Parser.Fields.Count - 1)
+            Write(",");
+        else
+            Write(";");
+        WriteLine("");
+    }
 #>
-<# PopIndent(); #>
+
+@Getter
+private final byte value;
+
+private <#= Parser.Class.Name #>(int value) {
+    if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
+        throw new IllegalArgumentException("Out of byte bounds value: " + value);
+    }
+    this.value = (byte) value;
+}
+
+public static Optional<<#= Parser.Class.Name #>> valueOf(byte value) {
+	for (<#= Parser.Class.Name #> v : values()) {
+		if (v.value == value) {
+			return Optional.of(v);
+		}
+	}
+	return Optional.empty();
 }
 <# PopIndent(); #>
 }

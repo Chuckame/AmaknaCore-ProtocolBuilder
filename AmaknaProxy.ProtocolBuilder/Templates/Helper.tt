@@ -1,4 +1,5 @@
-﻿<#@ assembly name="System.dll" #>
+<#@ assembly name="System.dll" #>
+<#@ assembly name="$(TargetPath)" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="System.Linq" #>
@@ -6,321 +7,210 @@
 <#@ import namespace="ProtocolBuilder" #>
 <#@ import namespace="ProtocolBuilder.Parsing" #>
 <#@ import namespace="ProtocolBuilder.XmlPatterns" #>
-
 <#+
-void WriteField(FieldInfo field)
-{
-	switch (field.Modifiers)
-	{
-		case AccessModifiers.Public:
-			Write("public ");
-			break;
-		case AccessModifiers.Protected:
-			Write("protected ");
-			break;
-		case AccessModifiers.Private:
-			Write("private ");
-			break;
-		case AccessModifiers.Internal:
-			Write("internal ");
-			break;
-	}
-
-	if (field.IsConst)
-	{
-		Write("const ");
-	}
-
-	if (field.IsStatic)
-	{
-		Write("static ");
-	}
-
-	Write(field.Type.Replace("float", "double") + " ");
-	Write(field.Name);
-
-	if (!string.IsNullOrEmpty(field.Value))
-	{
-		Write(" = " + field.Value);
-	}
-
-	Write(";");
-	WriteLine("");
+void WriteNecessaryImports(XmlComponent component) {
+    foreach (var field in component.Fields) {
+        if (field.IsStaticType || field.IsPolymorphicType) {
+            WriteLine($"import {GetTypeFullName(field.WriteType)};");
+        }
+    }
 }
 
 void WriteField(XmlField field)
 {
-    Write("public ");
-
-    Write(GetRealType(field.Type).Replace("float", "double"));
-    Write(" " + field.Name);
-
-    WriteLine(";");
-} 
-    
-XmlField[] GetHierarchyFields(XmlMessage message)
-{
-	if (message.Heritage == string.Empty ||
-        message.Heritage == "Message")
-		return new XmlField[0];
-
-    var baseMessage = Program.Configuration.XmlMessagesProfile.SearchXmlPattern(message.Heritage);
-
-	if (baseMessage == null)
-        return new XmlField[0];
-
-    return GetHierarchyFields(baseMessage).Concat(baseMessage.Fields).ToArray();
+	WriteLine($"private {GetRealType(field)} {field.Name};");
 }
 
-XmlField[] GetHierarchyFields(XmlType type)
+void WriteSerializeMethodStatements(XmlComponent component)
 {
-    if (type.Heritage == string.Empty ||
-        type.Heritage == "Object")
-        return new XmlField[0];
-
-    var baseType = Program.Configuration.XmlTypesProfile.SearchXmlPattern(type.Heritage);
-
-    if (baseType == null)
-        return new XmlField[0];
-
-    return GetHierarchyFields(baseType).Concat(baseType.Fields).ToArray();
-}
-    
-void WriteIOMethodStatements(IEnumerable<XmlField> fields, bool serializeMethod)
-{
-	bool limitDefined = false;
+    if (HasHeritage(component)) {
+        WriteLine("super.serialize(writer);");
+    }
     int? flagsCount = null;
     int? lastFlagOffset = null;
-    foreach(var field in fields)
+    foreach(var field in component.Fields)
     {
-		string limit = field.Limit;
-		string type = field.Type;
-		string name = field.Name;
+		string fieldName = $"this.{field.Name}";
 
-		bool array = false;
+		if (field.IsArray) {
+            WriteLine($"writer.write{field.ArrayLengthWriteType}({fieldName}.length);");
+		    WriteLine($"for (var entry : {fieldName}) {{");
+			PushIndent("    ");
 
-		if (type.EndsWith("[]"))
-		{
-            array = true;
-            
-			if (string.IsNullOrEmpty(limit))
-			{
-				if (!serializeMethod)
-				{
-					if(type.StartsWith("byte") || type.StartsWith("sbyte") || type.StartsWith("string") || type.StartsWith("ushort"))
-					{
-						WriteLine((limitDefined ? string.Empty : "var ") + "limit = (ushort)reader.ReadVarInt();");
-					}
-					else
-					{
-						WriteLine((limitDefined ? string.Empty : "var ") + "limit = (ushort)reader.ReadUShort();");
-					}
-					limitDefined = true;
-				}
-
-				limit = "limit";
-
-				if (serializeMethod)
-				{
-                    if (Program.Configuration.UseIEnumerable)
-					{
-						if(type.StartsWith("byte") || type.StartsWith("sbyte") || type.StartsWith("string") || type.StartsWith("ushort"))
-						{
-							WriteLine("writer.WriteVarInt((ushort)" + name + ".Count());");
-						}
-						else
-						{
-							WriteLine("writer.WriteShort((short)" + name + ".Count());");
-						}
-					}
-					else
-					{
-						if(type.StartsWith("byte") || type.StartsWith("sbyte") || type.StartsWith("string") || type.StartsWith("ushort"))
-						{
-							WriteLine("writer.WriteVarInt((ushort)" + name + ".Length);");
-						}
-						else
-						{
-							WriteLine("writer.WriteShort((short)" + name + ".Length);");
-						}
-					}
-				}
-			}
-
-			type = type.Substring(0, type.Length - 2);
-
-			if (!serializeMethod)
-			{
-                WriteLine(string.Format("{0} = new {1}[{2}];", name, GetRealType(type), limit));
-				WriteLine("for (int i = 0; i < " + limit + "; i++)");
-				WriteLine("{");
-				PushIndent("     ");
-
-                name = Program.Configuration.UseIEnumerable ?
-                    string.Format("({0} as {1}[])[i]", name, GetRealType(type)) :
-					name + "[i]";
-			}
-			else
-			{
-				WriteLine("foreach (var entry in " + field.Name + ")");
-				WriteLine("{");
-				PushIndent("     ");
-
-                name = "entry";
-			}
+			fieldName = "entry";
 		}
 
-		if (serializeMethod &&
-			(lastFlagOffset.HasValue && flagsCount.HasValue) &&
-			(lastFlagOffset.Value >= 7 || !type.StartsWith("flag") ))
+		if (flagsCount.HasValue && lastFlagOffset.HasValue && (lastFlagOffset.Value >= 7 || field.ReadType != "Flag" ))
 		{
-			WriteLine("writer.WriteByte(flag" + flagsCount + ");");
+			WriteLine($"writer.writeByte(flag{flagsCount});");
 			lastFlagOffset = null;
 		}
 
-		if (type.StartsWith("flag"))
+		if (field.ReadType == "Flag")
 		{
-			Match match = Regex.Match(type, @"flag\((\d+)\)");
-
-			if (match.Success)
+			if (!lastFlagOffset.HasValue || lastFlagOffset.Value >= 7)
 			{
-				if (!lastFlagOffset.HasValue || lastFlagOffset.Value >= 7)
-				{
-					flagsCount = flagsCount.HasValue ? flagsCount + 1 : 1;
-
-					if (serializeMethod)
-						WriteLine("byte flag" + flagsCount + " = 0;");
-					else
-						WriteLine("byte flag" + flagsCount + " = reader.ReadByte();");
-				}
-
-				int flagOffset = int.Parse(match.Groups[1].Value);
-				lastFlagOffset = flagOffset;
-
-				if (serializeMethod)
-					WriteLine(string.Format("flag{0} = BooleanByteWrapper.SetFlag(flag{0}, {1}, {2});", flagsCount, flagOffset, name));
-				else
-					WriteLine(string.Format("{0} = BooleanByteWrapper.GetFlag(flag{1}, {2});", name, flagsCount, flagOffset));
+				flagsCount = flagsCount.HasValue ? flagsCount + 1 : 1;
+			    WriteLine($"byte flag{flagsCount} = 0;");
 			}
+
+			int flagOffset = field.FlagIndex;
+			lastFlagOffset = flagOffset;
+		    WriteLine($"flag{flagsCount} = BooleanByteWrapper.setFlag(flag{flagsCount}, {flagOffset}, {fieldName});");
+		} else if (field.IsStaticType) {
+			WriteLine($"writer.writeStaticType({fieldName});");
+		} else if (field.IsPolymorphicType) {
+		    WriteLine($"writer.writePolymorphicType({fieldName});");
+		} else {
+			WriteLine($"writer.write{field.WriteType}({fieldName});");
 		}
-		else if (type.StartsWith("Types."))
-		{
-			if (serializeMethod)
-				WriteLine(string.Format("{0}.Serialize(writer);", name));
-			else
-			{
-				WriteLine(string.Format("{0} = new {1}();", name, type));
-				WriteLine(string.Format("{0}.Deserialize(reader);", name));
-			}
-		}
-		else if (type.StartsWith("instance of"))
-		{
-         
-			if (serializeMethod)
-			{
-				WriteLine(string.Format("writer.WriteShort({0}.TypeId);", name));
-				WriteLine(string.Format("{0}.Serialize(writer);", name));
-			}
-			else
-			{            
-				Match match = Regex.Match(type, @"instance of ([\w\d_\.]+)");
 
-				if (match.Success)
-				{  
-					string instanceType = match.Groups[1].Value;
-                    
-					WriteLine(string.Format("{0} = ProtocolTypeManager.GetInstance<{1}>(reader.ReadUShort());", name, instanceType));
-					WriteLine(string.Format("{0}.Deserialize(reader);", name));
-				}
-				else
-					Error(string.Format("Type {0} doesn't match 'instance of ([\\w\\d_\\.]+)'", type));
+		if (field.IsArray) {
+			PopIndent();
+            WriteLine("}");
+		}
+    }
+
+    if (lastFlagOffset.HasValue) {
+		WriteLine($"writer.writeByte(flag{flagsCount});");
+    }
+}
+
+void WriteDeserializeMethodStatements(XmlComponent component)
+    {
+    if (HasHeritage(component)) {
+        WriteLine("super.deserialize(reader);");
+    }
+    int? flagsCount = null;
+    int? lastFlagOffset = null;
+    foreach(var field in component.Fields)
+    {
+		string fieldName = "this." + field.Name;
+
+		if (field.IsArray) {
+            WriteLine($"{fieldName} = new {GetRealTypeWithoutArray(field)}[reader.read{field.ArrayLengthReadType}()];");
+			WriteLine($"for (int i = 0; i < {fieldName}.length; i++) {{");
+			PushIndent("    ");
+
+			fieldName += "[i]";
+		}
+
+		if (field.ReadType == "Flag")
+		{
+			if (!lastFlagOffset.HasValue || lastFlagOffset.Value >= 7)
+			{
+				flagsCount = flagsCount.HasValue ? flagsCount + 1 : 1;
+			    WriteLine($"byte flag{flagsCount} = reader.readByte();");
 			}
+
+			lastFlagOffset = field.FlagIndex;
+		    WriteLine($"{fieldName} = BooleanByteWrapper.getFlag(flag{flagsCount}, {field.FlagIndex});");
+		}
+		else if (field.IsStaticType)
+		{
+			WriteLine($"{fieldName} = reader.readStaticType({field.ReadType}.class);");
+		}
+		else if (field.IsPolymorphicType)
+		{
+		    WriteLine($"{fieldName} = reader.readPolymorphicType({field.ReadType}.class);");
 		}
 		else
 		{
-			if (serializeMethod)
-				WriteLine(string.Format("writer.Write{0}({1});", GetIOMethodTypeName(type), name));
-			else
-				WriteLine(string.Format("{0} = reader.Read{1}();", name, GetIOMethodTypeName(type)));
-		}
-        
-		if (!string.IsNullOrEmpty(field.Condition))
-		{
-			if (!serializeMethod)
-			{
-			}
+			WriteLine($"{fieldName} = reader.read{field.ReadType}();");
 		}
 
-		if (array)
+		if (field.IsArray)
 		{
 			PopIndent();
             WriteLine("}");
 		}
     }
-        
-    if (lastFlagOffset.HasValue)
-    {
-        if (serializeMethod)
-			WriteLine("writer.WriteByte(flag" + flagsCount + ");");
-    }
 }
 
-string GetRealType(string rawType)
+string GetRealType(XmlField field, bool fullPathForTypes = false)
 {
-    if (rawType.StartsWith("instance of "))
-        rawType = rawType.Replace("instance of ", "");
-
-    var match = Regex.Match(rawType, @"([\.\w\d_]+)\[\]");
-
-    if (match.Success)
-    {
-        if (Program.Configuration.UseIEnumerable)
-            return "IEnumerable<" + GetRealType(match.Groups[1].Value) + ">";
-
-        return GetRealType(match.Groups[1].Value) + "[]";
-    }
-
-    if (rawType.StartsWith("flag"))
-        return "bool";
-	
-	rawType = rawType.Replace("float", "double");
-
-
-    switch (rawType)
-    {
-        case "utf":
-            return "string";
-        case "boolean":
-            return "bool";
-        default:
-            return rawType;
-    }
+    string realType = GetRealTypeWithoutArray(field, fullPathForTypes);
+    if (field.IsArray)
+        realType += "[]";
+    return realType;
 }
-    
-string GetIOMethodTypeName(string rawType)
+
+string GetRealTypeWithoutArray(XmlField field, bool fullPathForTypes = false)
 {
-    if (rawType.StartsWith("instance of "))
-        rawType = rawType.Replace("instance of ", "");
-
-    char[] letters = rawType.ToCharArray();
-
-    if (rawType == "utf")
-        return "UTF";
-
-	if(rawType == "sbyte")
-		rawType = "byte";
-
-    if (rawType.StartsWith("u") || rawType == "sbyte")
-    {
-        letters[0] = char.ToUpper(letters[0]);
-        letters[1] = char.ToUpper(letters[1]);
-
-        return new string(letters);
+    string realType = field.ReadType;
+    if (field.IsStaticType || field.IsPolymorphicType) {
+        if (fullPathForTypes)
+            realType = GetTypeFullName(realType);
+    } else {
+        realType = GetRealType(realType);
     }
+    return realType;
+} 
 
-
-    letters[0] = char.ToUpper(letters[0]);
-
-    return new string(letters);
+string GetRealType(string type)
+{
+    switch (type)
+    {
+        case "Flag":          return "boolean";
+        case "Boolean":       return "boolean";
+        case "Double":        return "double";
+        case "Float":         return "float";
+        case "Byte":          return "byte";
+        case "Bytes":         return "byte[]";
+        case "UnsignedByte":  return "short";
+        case "Short":         return "short";
+        case "UnsignedShort": return "int";
+        case "Int":           return "int";
+        case "UnsignedInt":   return "long";
+        case "VarShort":      return "int";
+        case "VarUhShort":    return "int";
+        case "VarInt":        return "long";
+        case "VarUhInt":      return "long";
+        case "VarLong":       return "java.math.BigInteger";
+        case "VarUhLong":     return "java.math.BigInteger";
+        case "UTF":           return "String";
+		case "Rectangle":     return "fr.chuckame.dofus.protocol.shared.Rectangle";
+		case "Point":         return "fr.chuckame.dofus.protocol.shared.Point";
+		case "TransformData": return "fr.chuckame.dofus.protocol.shared.TransformData";
+        default:              return type;
+    }
 }
+
+string GetTypeFullName(string rawType)
+{
+	var type = Program.Configuration.XmlTypesProfile.SearchXmlPattern(rawType);
+    if (type == null)
+        Error($"No xml message found for {rawType}");
+	return Program.Configuration.TypesProfile.OutPutNamespace + "." + type.RelativePath + "." + type.Name;
+}
+
+string GetMessageFullName(string rawType)
+{
+	var type = Program.Configuration.XmlMessagesProfile.SearchXmlPattern(rawType);
+	if (type == null)
+        Error($"No xml type found for {rawType}");
+	return Profile.OutPutNamespace + "." + type.RelativePath + "." + type.Name;
+}
+
+bool HasHeritage(XmlComponent component) {
+    return !string.IsNullOrEmpty(component.Heritage);
+}
+
+void WriteLombokAnnotations(XmlComponent component) {
+    WriteLombokAnnotations(!string.IsNullOrEmpty(component.Heritage));
+}
+
+void WriteLombokAnnotations(bool hasHeritage) {
+	WriteLine("@Data");
+	WriteLine("@NoArgsConstructor");
+    if (hasHeritage) {
+		WriteLine("@ToString(callSuper = true)");
+		WriteLine("@EqualsAndHashCode(callSuper = true)");
+    }
+}
+
+void WriteGeneratedAnnotation() {
+    WriteLine("@javax.annotation.processing.Generated(\"ProtocolBuilder\")");
+}
+
 #>

@@ -1,6 +1,7 @@
 ﻿<#@ template language="C#" debug="true"  #>
-<#@ output extension=".cs" #>
+<#@ output extension=".java" #>
 <#@ assembly name="System.dll" #>
+<#@ assembly name="$(TargetPath)" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Collections.Generic" #>
@@ -8,106 +9,45 @@
 <#@ parameter name="Type" type="ProtocolBuilder.XmlPatterns.XmlType" #>
 <#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
-// Generated on <#= DateTime.Now #>
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using AmaknaProxy.API.IO;
+package <#= Profile.OutPutNamespace #>.<#= Type.RelativePath #>;
 
-namespace <#= Profile.OutPutNamespace #>
-{
+<# WriteNecessaryImports(Type); #>
+import fr.chuckame.dofus.io.*;
+import lombok.*;
+
+<# WriteLombokAnnotations(Type); #>
+<# WriteGeneratedAnnotation(); #>
+public class <#= Type.Name #> <#= HasHeritage(Type) ? "extends " + GetTypeFullName(Type.Heritage) : "implements NetworkType" #> {
 <# PushIndent("    "); #>
-public class <#= Type.Name #><#= !string.IsNullOrEmpty(Type.Heritage) && Type.Heritage != "Object" ? " : " + Type.Heritage : string.Empty  #>
-{
-<# PushIndent("    "); #>
-public const short Id = <#=Type.Id #>;
-public <#= !string.IsNullOrEmpty(Type.Heritage)
-        && Type.Heritage != "Object" ? "override" : "virtual" #> short TypeId
-{
-    get { return Id; }
-}
+public static final int PROTOCOL_ID = <#=Type.Id #>;
 
 <#
-foreach (var field in Type.Fields)
-{
-    WriteField(field);
-} 
-#>
-
-public <#=Type.Name #>()
-{
-}
-
-<#
-    var baseFields = GetHierarchyFields(Type);
-
-    if (Type.Fields.Length + baseFields.Length > 0)
-    {
-        Write("public " + Type.Name + "(");
-
-        if (baseFields.Length > 0)
-        {
-            Write(string.Join(", ", baseFields.Select(field => GetRealType(field.Type) + " " + field.Name)));
-
-            if (Type.Fields.Length > 0)
-                Write(", ");
-        }
-
-        if (Type.Fields.Length > 0)
-        {
-            Write(string.Join(", ", Type.Fields.Select(field => GetRealType(field.Type) + " " + field.Name)));
-        }
-
-        WriteLine(")");
-        if (baseFields.Length > 0)
-            WriteLine(" : base(" + string.Join(", ", baseFields.Select(field => field.Name)) + ")");
-        WriteLine("{");
-        PushIndent("    ");
-
-        foreach (var field in Type.Fields)
-        {
-            WriteLine("this." + field.Name + " = " + field.Name + ";");
-        }
-
-        PopIndent();
-        WriteLine("}");
+    foreach (var field in Type.Fields) {
+        WriteField(field);
     }
 #>
 
-public <#= !string.IsNullOrEmpty(Type.Heritage)
-        && Type.Heritage != "Object" ? "override" : "virtual" #> void Serialize(IDataWriter writer)
-{
-<# PushIndent("    "); #>
+@Override
+public int getProtocolId() {
+    return PROTOCOL_ID;
+}
+
+@Override
+public void serialize(DataWriter writer) {
 <#
-    if (!string.IsNullOrEmpty(Type.Heritage)
-        && Type.Heritage != "Object")
-    {
-        WriteLine("base.Serialize(writer);");
-    }
-
-    WriteIOMethodStatements(Type.Fields, true);
+    PushIndent("    ");
+    WriteSerializeMethodStatements(Type);
+    PopIndent();
 #>
-<# PopIndent(); #>
 }
 
-public <#= !string.IsNullOrEmpty(Type.Heritage)
-        && Type.Heritage != "Object" ? "override" : "virtual" #> void Deserialize(IDataReader reader)
-{
-<# PushIndent("    "); #>
+@Override
+public void deserialize(DataReader reader) {
 <#
-    if (!string.IsNullOrEmpty(Type.Heritage)
-        && Type.Heritage != "Object")
-    {
-        WriteLine("base.Deserialize(reader);");
-    }
-
-    WriteIOMethodStatements(Type.Fields, false);
+    PushIndent("    ");
+    WriteDeserializeMethodStatements(Type);
+    PopIndent();
 #>
-<# PopIndent(); #>
 }
-
-<# PopIndent(); #>
-}
-
 <# PopIndent(); #>
 }

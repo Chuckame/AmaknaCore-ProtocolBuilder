@@ -1,41 +1,32 @@
-﻿<#@ template language="C#" debug="true"  #>
-<#@ output extension=".cs" #>
+<#@ template language="C#" debug="true"  #>
+<#@ output extension=".java" #>
 <#@ assembly name="System.dll" #>
+<#@ assembly name="$(TargetPath)" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="ProtocolBuilder.Parsing" #>
 <#@ parameter name="Parser" type="ProtocolBuilder.Parsing.Parser" #>
 <#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
-// Generated on <#= DateTime.Now #>
-using System;
-using System.Collections.Generic;
-using AmaknaProxy.API.GameData.D2O;
+package <#= Profile.OutPutNamespace #>.<#= Profile.GetRelativePath(Parser.Filename).Replace('/', '.').Replace('\\', '.') #>;
 
-namespace <#= Profile.OutPutNamespace #>
-{
-<# PushIndent("    "); #>
-<#
-var module = Parser.Fields.FirstOrDefault(x => x.Name == "MODULE");
+import lombok.*;
 
-if (module != null)
-    WriteLine(string.Format("[D2oClass({0})]", module.Value));
-else
-    WriteLine(string.Format("[D2oClass(\"{0}\")]", Parser.Class.Name));
-#>
-public class <#=Parser.Class.Name #><#=( Parser.Class.Heritage != "" && Parser.Class.Heritage != "Object" && Parser.Class.Heritage != "Proxy" ? " : " + Parser.Class.Heritage : " : IDataObject" ) #>
-{
-<# PushIndent("    "); #>
-<#
+<# WriteLombokAnnotations(!string.IsNullOrEmpty(Parser.Class.Heritage)); #>
+<# WriteGeneratedAnnotation(); #>
+public class <#= Parser.Class.Name #><#= !string.IsNullOrEmpty(Parser.Class.Heritage) ? " extends " + Parser.Class.Heritage : "" #> {
+<# PushIndent("    ");
 foreach (var field in Parser.Fields)
 {
 	if (field.Modifiers != AccessModifiers.Public && field.Name != "MODULE")
 		continue;
 
-    WriteField(field);
-} 
-#>
-<# PopIndent(); #>
+    if (field.Name == "MODULE") {
+        WriteLine($"public static final String MODULE = {field.Value}");
+        continue;
+    }
+
+    WriteLine($"private {field.Type} {field.Name};");
 }
-<# PopIndent(); #>
+PopIndent(); #>
 }
