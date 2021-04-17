@@ -1,8 +1,7 @@
-﻿using System.Data;
-using System.Linq;
+﻿using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
+namespace ProtocolBuilder.Parsing.Elements
 {
     /// <summary>
     /// </summary>
@@ -11,8 +10,8 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
     /// </remarks>
     public class AssignationStatement : IStatement
     {
-        public static string Pattern =
-            @"^(?<var>var\s)?(?<variable>[^:=]+):?(?<type>[^=]+)?\s*=\s*(?<value>[^;]+);$";
+        private static Regex Pattern = new Regex(@"^(?<var>var\s)?(?<variable>[^:=]+):?(?:[^=]+)?\s*=\s*(?<value>[^;]+);$", RegexOptions.Multiline);
+        private static Regex VariablePattern = new Regex(@"^(?<target>[^\.]+\.)*(?<name>.+)", RegexOptions.Multiline);
 
         public string Name
         {
@@ -32,48 +31,38 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
             set;
         }
 
-        public string TypeDeclaration
+        public override string ToString()
         {
-            get;
-            set;
+            return $"{nameof(AssignationStatement)}({nameof(Name)}: {Name}, {nameof(Target)}: {Target}, {nameof(Value)}: {Value})";
         }
 
-        public static AssignationStatement Parse(string str)
-        {
-            Match match = Regex.Match(str, Pattern, RegexOptions.Multiline);
-            AssignationStatement result = null;
-
+        public static AssignationStatement? TryParse(string line) {
+            var match = Pattern.Match(line);
             if (match.Success)
+                return Parse(match);
+            return null;
+        }
+
+        private static AssignationStatement Parse(Match match)
+        {
+            var result = new AssignationStatement();
+
+            if (match.Groups["variable"].Value != "")
             {
-                result = new AssignationStatement();
+                Match variableMatch = VariablePattern.Match(match.Groups["variable"].Value);
 
-                if (match.Groups["var"].Value != "")
-                {
-                    result.TypeDeclaration = match.Groups["type"].Value.Trim();
-                }
+                result.Target = variableMatch.Groups["target"].Value.Trim().TrimEnd('.');
+                result.Name = variableMatch.Groups["name"].Value.Trim();
+            }
 
-                if (match.Groups["variable"].Value != "")
-                {
-                    Match variableMatch = Regex.Match(match.Groups["variable"].Value, @"^(?<target>[^\.]+\.)*(?<name>.+)", RegexOptions.Multiline);
+            result.Value = match.Groups["value"].Value.Trim();
 
-                    result.Target = variableMatch.Groups["target"].Value.Trim().TrimEnd('.');
-                    result.Name = variableMatch.Groups["name"].Value.Trim();
-                }    
+            if (result.Value.Contains("<") && !result.Value.Contains("\""))
+            {
+                string generictype = result.Value.Split('<').Last().Split('>').First().Split('.').Last();
+                string defaulttype = result.Value.Split('<').Last().Split('>').First();
 
-                result.Value = match.Groups["value"].Value.Trim();
-
-                if (!result.Value.Contains("\""))
-                {
-                    if (result.Value.Contains("<"))
-                    {
-                        string generictype = result.Value.Split('<').Last().Split('>').First().Split('.').Last();
-                        string defaulttype = result.Value.Split('<').Last().Split('>').First();
-
-                        result.Value = result.Value.Replace(defaulttype, generictype);
-                    }
-
-                    result.Value = result.Value;
-                }
+                result.Value = result.Value.Replace(defaulttype, generictype);
             }
 
             return result;

@@ -1,4 +1,4 @@
-﻿namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
+﻿namespace ProtocolBuilder.Parsing.Elements
 {
     public class UnknownStatement : IStatement
     {
@@ -6,6 +6,11 @@
 		{
 			get;
 			set;
+		}
+
+		public override string ToString()
+		{
+			return $"{nameof(UnknownStatement)}({Value})";
 		}
     }
 }

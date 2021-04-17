@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using AmaknaProxy.ProtocolBuilder.Parsing.Elements;
+﻿using System.Collections.Generic;
+using ProtocolBuilder.Parsing.Elements;
 
-namespace AmaknaProxy.ProtocolBuilder.Parsing
+namespace ProtocolBuilder.Parsing
 {
 	public struct Argument
 	{
 		public string Name;
 		public string Type;
 
-	    public Argument(string name, string type, string defaultValue = default(string))
+	    public Argument(string name, string type, string defaultValue = default)
 	    {
 	        Name = name;
 	        Type = type;

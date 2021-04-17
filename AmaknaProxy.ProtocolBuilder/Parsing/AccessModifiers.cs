@@ -1,4 +1,4 @@
-﻿namespace AmaknaProxy.ProtocolBuilder.Parsing
+﻿namespace ProtocolBuilder.Parsing
 {
     public enum AccessModifiers
     {

@@ -1,7 +1,7 @@
 ﻿using System;
-using AmaknaProxy.ProtocolBuilder.Profiles;
+using ProtocolBuilder.Profiles;
 
-namespace AmaknaProxy.ProtocolBuilder
+namespace ProtocolBuilder
 {
     [Serializable]
     public class Configuration
@@ -29,6 +29,12 @@ namespace AmaknaProxy.ProtocolBuilder
             get;
             set;
         }
+
+        public uint Parallelism
+        {
+            get;
+            set;
+        } = 8;
 
         public XmlMessagesProfile XmlMessagesProfile
         {
@@ -80,7 +86,6 @@ namespace AmaknaProxy.ProtocolBuilder
                         Name = "Xml Messages classes",
                         OutPutPath = "Messages_Xml/",
                         SourcePath = @"com/ankamagames/dofus/network/messages/",
-                        EnableParsing = true,
                     };
 
             XmlTypesProfile =
@@ -89,8 +94,6 @@ namespace AmaknaProxy.ProtocolBuilder
                         Name = "Xml Types classes",
                         OutPutPath = "Types_Xml/",
                         SourcePath = @"com/ankamagames/dofus/network/types/",
-                        EnableParsing = true,
-                        
                     };
 
             MessagesProfile =
@@ -121,7 +124,6 @@ namespace AmaknaProxy.ProtocolBuilder
                         OutPutPath = "Enums/",
                         OutPutNamespace = ".Enums",
                         TemplatePath = "./Templates/EnumTemplate.tt",
-                        EnableParsing = true,
                     };
 
             DatacenterProfile =
@@ -132,8 +134,6 @@ namespace AmaknaProxy.ProtocolBuilder
                         OutPutPath = "Data/",
                         OutPutNamespace = ".Data",
                         TemplatePath = "./Templates/DataCenterTemplate.tt",
-                        IgnoreMethods = true,
-                        EnableParsing = true,
                     };
         }
     }

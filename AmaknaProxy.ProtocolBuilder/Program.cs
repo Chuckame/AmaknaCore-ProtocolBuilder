@@ -1,17 +1,13 @@
-﻿using System;
-using System.CodeDom.Compiler;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.Remoting.Messaging;
+using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
-using AmaknaProxy.ProtocolBuilder.Parsing;
-using AmaknaProxy.ProtocolBuilder.Profiles;
-using AmaknaProxy.ProtocolBuilder.Templates;
-using Microsoft.VisualStudio.TextTemplating;
+using ProtocolBuilder.Parsing;
+using ProtocolBuilder.Profiles;
 
-
-namespace AmaknaProxy.ProtocolBuilder
+namespace ProtocolBuilder
 {
     public class Program
     {
@@ -67,17 +63,17 @@ namespace AmaknaProxy.ProtocolBuilder
             var profiles =
             new ParsingProfile[]
                 {
-                    Configuration.XmlMessagesProfile,
                     Configuration.XmlTypesProfile,
-                    Configuration.MessagesProfile,
+                    Configuration.XmlMessagesProfile,
                     Configuration.TypesProfile,
+                    Configuration.MessagesProfile,
                     Configuration.DatacenterProfile,
                     Configuration.EnumsProfile,
                 };
 
             foreach (ParsingProfile parsingProfile in profiles)
             {
-                if (parsingProfile == null)
+                if (parsingProfile == null || parsingProfile.Disabled)
                     continue;
 
                 Console.WriteLine("Executing profile \'{0}\' ... ", parsingProfile.Name);
@@ -100,7 +96,7 @@ namespace AmaknaProxy.ProtocolBuilder
                     Path.Combine(Configuration.SourcePath, parsingProfile.SourcePath), "*.as",
                     SearchOption.AllDirectories);
 
-                foreach (string file in files)
+                Parallel.ForEach(files, new ParallelOptions() {MaxDegreeOfParallelism = (int)Configuration.Parallelism}, file =>
                 {
                     string relativePath = parsingProfile.GetRelativePath(file);
 
@@ -108,28 +104,22 @@ namespace AmaknaProxy.ProtocolBuilder
                         Directory.CreateDirectory(Path.Combine(Configuration.Output, parsingProfile.OutPutPath, relativePath));
 
                     var parser = new Parser(file, parsingProfile.BeforeParsingReplacementRules,
-                                            parsingProfile.IgnoredLines)
-                        {IgnoreMethods = parsingProfile.IgnoreMethods};
-
-
-                    if (file.EndsWith("GameRolePlayShowActorMessage.as"))
-                    {
-                        Console.WriteLine();
-                    }
+                            parsingProfile.IgnoredLines)
+                        {IgnoreMethods = parsingProfile.MethodsIgnored()};
 
                     try
                     {
-                        if (parsingProfile.EnableParsing)
+                        if (parsingProfile.ParsingEnabled())
                             parser.ParseFile();
                     }
-                    catch (InvalidCodeFileException)
+                    catch (Exception e)
                     {
-                        Console.WriteLine("File {0} not parsed correctly", Path.GetFileName(file));
-                        continue;
+                        Console.Error.WriteLine($"File {Path.GetFileName(file)} not parsed correctly: {e.Message}");
+                        return;
                     }
 
                     parsingProfile.ExecuteProfile(parser);
-                }
+                });
 
                 Console.WriteLine("Done !");
             }
@@ -161,12 +151,8 @@ namespace AmaknaProxy.ProtocolBuilder
 
         public static void Shutdown(string reason = "")
         {
-            Console.WriteLine("The program is shutting down {0}", (reason != "" ? ": " + reason : ""));
-
-            Console.WriteLine("Press any key to exit...");
-            Console.Read();
-
-            Environment.Exit(0);
+            Console.Error.WriteLine("The program is shutting down{0}", !string.IsNullOrEmpty(reason) ? $" for reason: {reason}" : "");
+            Environment.Exit(1);
         }
     }
 }

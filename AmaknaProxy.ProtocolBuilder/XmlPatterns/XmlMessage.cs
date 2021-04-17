@@ -1,42 +1,6 @@
-using System;
-using System.Xml.Serialization;
-
-namespace AmaknaProxy.ProtocolBuilder.XmlPatterns
+namespace ProtocolBuilder.XmlPatterns
 {
-    public class XmlMessage
+    public class XmlMessage : XmlComponent
     {
-        [XmlAttribute]
-        public string Name
-        {
-            get;
-            set;
-        }
-
-        [XmlAttribute]
-        public string Id
-        {
-            get;
-            set;
-        }
-
-        [XmlAttribute]
-        public string Heritage
-        {
-            get;
-            set;
-        }
-
-        [XmlAttribute]
-        public string Namespace
-        {
-            get;
-            set;
-        }
-
-        public XmlField[] Fields
-        {
-            get;
-            set;
-        }
     }
 }

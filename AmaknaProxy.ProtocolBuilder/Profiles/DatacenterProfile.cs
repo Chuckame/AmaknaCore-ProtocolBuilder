@@ -1,35 +1,22 @@
-using System;
-using System.CodeDom.Compiler;
-using System.IO;
-using System.Linq;
-using AmaknaProxy.ProtocolBuilder.Parsing;
-using AmaknaProxy.ProtocolBuilder.Templates;
-using Microsoft.VisualStudio.TextTemplating;
+using ProtocolBuilder.Parsing;
+using ProtocolBuilder.Templates;
 
-namespace AmaknaProxy.ProtocolBuilder.Profiles
+namespace ProtocolBuilder.Profiles
 {
-    public class DatacenterProfile : ParsingProfile
+    public class DatacenterProfile : TemplateProfile
     {
         public DatacenterProfile()
         {
             BeforeParsingReplacementRules =
                 new SerializableDictionary<string, string>
                     {
-                        {@"(var\s|this\.)base(?![\w\d])", @"$1@base"},
-                        // add '@' on variable name that are keyword in c#,
-                        {@"(var\s|this\.)object(?![\w\d])", @"$1@object"},
-                        {@"(var\s|this\.)operator(?![\w\d])", @"$1@operator"},
-                        {@"(var\s|this\.)params(?![\w\d])", @"$1@params"},
-                        // operator to @operator because it's a keyword
-
                         {@"Vector\.([\w_\d]+) = new ([\w_\d]+)();", "$1 = new List<$2>();"},
                         // convert "Vector." to List (C#) (and its props)
                         {@"new Vector\.<([\d\w]+)>\((\d+), (true|false)\)", "new List<$1>($2)"},
                         {@"new Vector\.<([\d\w]+)>", "new List<$1>()"},
                         {@"(__AS3__\.vec\.)?Vector\.", "List"},
-                        {@"\.push\(", @".Add("},
                         {@"\.length", @".Count"},
-                        {@"\bNumber", @"float"},
+                        {@"\bNumber", @"double"},
                         // convert Number to float
 
                         {@"static const", "const"},
@@ -53,31 +40,13 @@ namespace AmaknaProxy.ProtocolBuilder.Profiles
                     };
         }
 
-        public override void ExecuteProfile(Parser parser)
+        public override bool ParsingEnabled()
         {
-            string file = Path.Combine(Program.Configuration.Output, OutPutPath, GetRelativePath(parser.Filename),
-                                       Path.GetFileNameWithoutExtension(parser.Filename));
+            return true;
+        }
 
-            string moduleFile =
-                parser.Fields.Where(entry => entry.Name == "MODULE").Select(entry => entry.Value).SingleOrDefault();
-
-            var engine = new Engine();
-            var host = new TemplateHost(TemplatePath);
-            host.Session["Parser"] = parser;
-            host.Session["Profile"] = this;
-            string output = engine.ProcessTemplate(File.ReadAllText(TemplatePath), host);
-
-            foreach (CompilerError error in host.Errors)
-            {
-                Console.WriteLine(error.ErrorText);
-            }
-
-            if (host.Errors.Count > 0)
-                Program.Shutdown();
-
-            File.WriteAllText(file + host.FileExtension, output);
-
-            Console.WriteLine("Wrote {0}", file + host.FileExtension);
+        protected override void SetTemplateParams(Parser parser, string file, TemplateHost host)
+        {
         }
     }
 }

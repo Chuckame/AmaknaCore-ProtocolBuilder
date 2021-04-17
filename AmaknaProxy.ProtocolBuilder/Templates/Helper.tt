@@ -3,9 +3,9 @@
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Text.RegularExpressions" #>
-<#@ import namespace="AmaknaProxy.ProtocolBuilder" #>
-<#@ import namespace="AmaknaProxy.ProtocolBuilder.Parsing" #>
-<#@ import namespace="AmaknaProxy.ProtocolBuilder.XmlPatterns" #>
+<#@ import namespace="ProtocolBuilder" #>
+<#@ import namespace="ProtocolBuilder.Parsing" #>
+<#@ import namespace="ProtocolBuilder.XmlPatterns" #>
 
 <#+
 void WriteField(FieldInfo field)

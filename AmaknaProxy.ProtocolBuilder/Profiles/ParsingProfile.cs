@@ -1,10 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
-using AmaknaProxy.ProtocolBuilder.Parsing;
+using ProtocolBuilder.Parsing;
 
-namespace AmaknaProxy.ProtocolBuilder.Profiles
+namespace ProtocolBuilder.Profiles
 {
     [Serializable]
     [XmlInclude(typeof(DatacenterProfile))]
@@ -40,17 +39,15 @@ namespace AmaknaProxy.ProtocolBuilder.Profiles
             set;
         }
 
-        public bool EnableParsing
+        public bool Disabled
         {
             get;
             set;
         }
 
-        public bool IgnoreMethods
-        {
-            get;
-            set;
-        }
+        public abstract bool ParsingEnabled();
+
+        public abstract bool MethodsIgnored();
 
         [XmlIgnore]
         public SerializableDictionary<string, string> BeforeParsingReplacementRules
@@ -79,8 +76,8 @@ namespace AmaknaProxy.ProtocolBuilder.Profiles
         /// </summary>
         public string GetRelativePath(string file)
         {
-            string folder = Path.GetDirectoryName(file);
-            string[] foldersSplitted = folder.Split(new[] {SourcePath.Replace("/", "\\")}, StringSplitOptions.RemoveEmptyEntries); // cut the source path and the "rest" of the path
+            string folder = Path.GetDirectoryName(file).Replace("\\", "/");
+            string[] foldersSplitted = folder.Split(new[] {SourcePath.Replace("\\", "/")}, StringSplitOptions.RemoveEmptyEntries); // cut the source path and the "rest" of the path
 
             return foldersSplitted.Length > 1 ? foldersSplitted[1] : ""; // return the "rest"
         }

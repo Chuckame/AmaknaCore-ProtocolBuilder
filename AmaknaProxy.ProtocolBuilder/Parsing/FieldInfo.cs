@@ -1,4 +1,5 @@
-﻿namespace AmaknaProxy.ProtocolBuilder.Parsing
+﻿
+namespace ProtocolBuilder.Parsing
 {
     public class FieldInfo
     {
@@ -20,6 +21,11 @@
             set;
         }
 
+        public bool IsProtocolField
+        {
+            get; set;
+        }
+
         public string Value
         {
             get;
@@ -32,9 +38,9 @@
             set;
         }
 
-		public bool IsConst
-		{
-			get; set;
-		}
+        public bool IsConst
+        {
+            get; set;
+        }
     }
 }

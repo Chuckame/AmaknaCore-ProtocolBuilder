@@ -7,9 +7,12 @@
     <ProjectGuid>{408364C5-337D-4FC5-8588-D2C7CE7CB06B}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AmaknaCore.ProtocolBuilder</RootNamespace>
-    <AssemblyName>AmaknaCore.ProtocolBuilder</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <RootNamespace>ProtocolBuilder</RootNamespace>
+    <AssemblyName>ProtocolBuilder</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <NullableContextOptions>enable</NullableContextOptions>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -34,11 +37,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.VisualStudio.TextTemplating.10.0">
-      <HintPath>..\Libs\Microsoft.VisualStudio.TextTemplating.10.0.dll</HintPath>
+      <HintPath>.\Microsoft.VisualStudio.TextTemplating.10.0.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.TextTemplating.Interfaces.10.0, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\Projects\BehaviorIsManaged-master\BehaviorIsManaged-master\Librairies\Microsoft.VisualStudio.TextTemplating.Interfaces.10.0.dll</HintPath>
+      <HintPath>.\Microsoft.VisualStudio.TextTemplating.Interfaces.10.0.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -55,8 +58,6 @@
     <Compile Include="Parsing\ClassInfo.cs" />
     <Compile Include="Parsing\Elements\AssignationStatement.cs" />
     <Compile Include="Parsing\Elements\ControlStatement.cs" />
-    <Compile Include="Parsing\Elements\ControlType.cs" />
-    <Compile Include="Parsing\Elements\ForEachStatement.cs" />
     <Compile Include="Parsing\Elements\ForStatement.cs" />
     <Compile Include="Parsing\Elements\InvokeExpression.cs" />
     <Compile Include="Parsing\Elements\IStatement.cs" />
@@ -70,13 +71,16 @@
     <Compile Include="Profiles\EnumsProfile.cs" />
     <Compile Include="Profiles\MessagesProfile.cs" />
     <Compile Include="Profiles\ParsingProfile.cs" />
+    <Compile Include="Profiles\TemplateProfile.cs" />
     <Compile Include="Profiles\TypesProfile.cs" />
     <Compile Include="Profiles\XmlMessagesProfile.cs" />
+    <Compile Include="Profiles\XmlProfile.cs" />
     <Compile Include="Profiles\XmlTypesProfile.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerializableDictionary.cs" />
     <Compile Include="Templates\TemplateHost.cs" />
+    <Compile Include="XmlPatterns\XmlComponent.cs" />
     <Compile Include="XmlPatterns\XmlField.cs" />
     <Compile Include="XmlPatterns\XmlMessage.cs" />
     <Compile Include="XmlPatterns\XmlMessageBuilder.cs" />
@@ -85,7 +89,7 @@
     <Compile Include="XmlPatterns\XmlTypesBuilder.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Templates\MessageTemplate.tt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

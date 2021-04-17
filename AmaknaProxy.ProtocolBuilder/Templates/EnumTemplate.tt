@@ -3,9 +3,9 @@
 <#@ assembly name="System.dll" #>
 <#@ import namespace="System" #>
 <#@ import namespace="System.Collections.Generic" #>
-<#@ import namespace="AmaknaProxy.ProtocolBuilder.Parsing" #>
-<#@ parameter name="Parser" type="AmaknaProxy.ProtocolBuilder.Parsing.Parser" #>
-<#@ parameter name="Profile" type="AmaknaProxy.ProtocolBuilder.Profiles.ParsingProfile" #>
+<#@ import namespace="ProtocolBuilder.Parsing" #>
+<#@ parameter name="Parser" type="ProtocolBuilder.Parsing.Parser" #>
+<#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
 // Generated on <#= DateTime.Now #>
 using System;

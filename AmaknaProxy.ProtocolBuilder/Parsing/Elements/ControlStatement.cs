@@ -1,17 +1,30 @@
 ﻿using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
+namespace ProtocolBuilder.Parsing.Elements
 {
     public class ControlStatementEnd : IStatement
     {
-
+        public override string ToString()
+        {
+            return $"{nameof(ControlStatementEnd)}()";
+        }
+    }
+    
+    public enum ControlType
+    {
+        If,
+        Else,
+        Elseif,
+        While,
+        Break,
+        Return
     }
 
     public class ControlStatement : IStatement
     {
-        public static string Pattern =
-            @"\b(?<type>if|else if|else|while|break|return);?\s*(?<condition>\(?\s*[^;]*\s*\)?)?";
+        private static Regex Pattern = new Regex(@"\b(?<type>if|else if|else|while|break|return);?\s*(?<condition>\(?\s*[^;]*\s*\)?)?", RegexOptions.Multiline);
 
         public ControlType ControlType
         {
@@ -25,32 +38,28 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing.Elements
             set;
         }
 
-        public static ControlStatement Parse(string str)
+        public override string ToString()
         {
-            Match match = Regex.Match(str, Pattern, RegexOptions.Multiline);
-            ControlStatement result = null;
+            return $"{nameof(ControlStatement)}({nameof(ControlType)}: {ControlType}, {nameof(Condition)}: {Condition})";
+        }
 
+        public static ControlStatement? TryParse(string line) {
+            var match = Pattern.Match(line);
             if (match.Success)
+                return Parse(match);
+            return null;
+        }
+
+        private static ControlStatement Parse(Match match)
+        {
+            var result = new ControlStatement();
+
+            if (match.Groups["type"].Value != "")
+                result.ControlType = (ControlType) Enum.Parse(typeof (ControlType), match.Groups["type"].Value.Replace(" ", ""), true);
+
+            if (match.Groups["condition"].Value != "")
             {
-                result = new ControlStatement();
-
-                if (match.Groups["type"].Value != "")
-					result.ControlType =
-                        (ControlType)
-                        Enum.Parse(typeof (ControlType), match.Groups["type"].Value.Replace(" ", ""), true);
-
-                if (match.Groups["condition"].Value != "")
-                {
-                    // remove the ( at the begin and the ) at the end
-                    if (match.Groups["condition"].Value.StartsWith("(") &&
-                        match.Groups["condition"].Value.EndsWith(")"))
-                        result.Condition = match.Groups["condition"].Value.
-                            Remove(match.Groups["condition"].Value.Length - 1, 1).
-                            Remove(0, 1).
-                            Trim();
-                    else
-                        result.Condition = match.Groups["condition"].Value.Trim();
-                }
+                result.Condition = match.Groups["condition"].Value.Split(')').First().Split('(').Last().Trim();
             }
 
             return result;

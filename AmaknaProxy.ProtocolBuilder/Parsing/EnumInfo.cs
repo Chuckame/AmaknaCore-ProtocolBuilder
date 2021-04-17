@@ -1,7 +1,6 @@
-using System;
 using System.Collections.Generic;
 
-namespace AmaknaProxy.ProtocolBuilder.Parsing
+namespace ProtocolBuilder.Parsing
 {
     public class EnumElement
     {

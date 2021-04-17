@@ -4,9 +4,9 @@
 <#@ import namespace="System" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Collections.Generic" #>
-<#@ import namespace="AmaknaProxy.ProtocolBuilder.Parsing" #>
-<#@ parameter name="Type" type="AmaknaProxy.ProtocolBuilder.XmlPatterns.XmlType" #>
-<#@ parameter name="Profile" type="AmaknaProxy.ProtocolBuilder.Profiles.ParsingProfile" #>
+<#@ import namespace="ProtocolBuilder.Parsing" #>
+<#@ parameter name="Type" type="ProtocolBuilder.XmlPatterns.XmlType" #>
+<#@ parameter name="Profile" type="ProtocolBuilder.Profiles.ParsingProfile" #>
 <#@ include file="./Helper.tt"#>
 // Generated on <#= DateTime.Now #>
 using System;

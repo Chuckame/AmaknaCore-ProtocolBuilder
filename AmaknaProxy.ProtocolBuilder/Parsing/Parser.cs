@@ -1,22 +1,21 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using AmaknaProxy.ProtocolBuilder.Parsing.Elements;
+using ProtocolBuilder.Parsing.Elements;
 
-namespace AmaknaProxy.ProtocolBuilder.Parsing
+namespace ProtocolBuilder.Parsing
 {
     [Serializable]
 	public class Parser
 	{
-        public static readonly string ClassPatern = @"public class (\w+)\s";
-        public static readonly string ClassHeritagePattern = @"extends (?:[\w_]+\.)*(\w+)";
-        public static readonly string ConstructorPattern = @"(?<acces>public|protected|private|internal)\s*function\s*(?<name>{0})\((?<argument>[^,)]+,?)*\)";
-        public static readonly string ConstFieldPattern = @"(?<acces>public|protected|private|internal)\s*(?<static>static)?\s*const\s*(?<name>\w+):(?<type>[\w_\.]+(?:<(?:\w+\.)*(?<generictype>[\w_<>]+)>)?)(?<value>\s*=\s*.*)?;";
-        public static readonly string FieldPattern = @"(?<acces>public|protected|private|internal)\s*(?<static>static)?\s*var\s*(?<name>[\w\d@]+):(?<type>[\w\d_\.<>]+)(?<value>\s*=\s*.*)?;";
-        public static readonly string MethodPattern = @"((?<acces>public|protected|private|internal)|(?<override>override)\s)+\s*function\s*(?<prop>get|set)?\s+(?<name>\w+)\((?<argument>[^,)]+,?)*\)\s*:\s*(?:\w+\.)*(?<returntype>\w+)";
+        private static readonly Regex NamespacePattern = new Regex(@"package (\w+(?:\.\w+)*)", RegexOptions.Multiline);
+        private static readonly Regex ClassPattern = new Regex(@"public class (?<className>\w+)(?: extends (?:\w+\.)*(?<heritage>\w+))?", RegexOptions.Multiline);
+        private static readonly string ConstructorPattern = @"(?<acces>public|protected|private|internal)\s*function\s*(?<name>{0})\((?<argument>[^,)]+,?)*\)";
+        private static readonly Regex ConstFieldPattern = new Regex(@"(?<acces>public|protected|private|internal)\s*(?<static>static)?\s*const\s*(?<name>\w+):(?<type>[\w_\.]+(?:<(?:\w+\.)*(?<generictype>[\w_<>]+)>)?)(?<value>\s*=\s*.*)?;", RegexOptions.Multiline);
+        private static readonly Regex FieldPattern = new Regex(@"(?<acces>public|protected|private|internal)\s*(?<static>static)?\s*var\s*(?<name>[\w\d@]+):(?<type>[\w\d_\.<>]+)(?<value>\s*=\s*.*)?;", RegexOptions.Multiline);
+        private static readonly Regex MethodPattern = new Regex(@"((?<acces>public|protected|private|internal)|(?<override>override)\s)+\s*function\s*(?<prop>get|set)?\s+(?<name>\w+)\((?<argument>[^,)]+,?)*\)\s*:\s*(?:\w+\.)*(?<returntype>\w+)", RegexOptions.Multiline);
 
 
         private string m_fileText;
@@ -49,12 +48,6 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             internal set;
         }
 
-        public List<MethodInfo> Constructors
-        {
-            get;
-            internal set;
-        }
-
         public List<FieldInfo> Fields
         {
             get;
@@ -79,14 +72,6 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             set;
         }
 
-
-        public Parser(string filename)
-        {
-            Filename = filename;
-            BeforeParsingRules = new Dictionary<string, string>();
-            IgnoredLines = new string[0];
-        }
-
         public Parser(string filename, IEnumerable<KeyValuePair<string, string>> beforeParsingRules, string[] ignoredLines)
         {
             Filename = filename;
@@ -100,45 +85,28 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             m_fileText = string.Join("\r\n", m_fileLines);
             m_brackets = FindBracketsIndexesByLines(m_fileLines, '{', '}');
 
+            var classMatch = ClassPattern.Match(m_fileText);
+
+            if (!classMatch.Success)
+            {
+                throw new InvalidCodeFileException("This file does not contain a class");
+            }
 
             Class = new ClassInfo
             {
-                Name = GetMatch(ClassPatern),
-                Heritage = GetMatch(ClassHeritagePattern),
+                Name = classMatch.Groups["className"].Value,
+                Heritage = classMatch.Groups["heritage"].Value,
+                Namespace = NamespacePattern.Match(m_fileText).Groups[1].Value,
                 AccessModifier = AccessModifiers.Public,
                 // we don't mind about this
                 ClassModifier = ClassInfo.ClassModifiers.None
             };
 
-            if (Class.Name == string.Empty)
-            {
-                throw new InvalidCodeFileException("This file does not contain a class");
-            }
-
-            Constructors = new List<MethodInfo>();
-
             ParseFields();
 
             if (!IgnoreMethods)
             {
-                ParseConstructor();
                 ParseMethods();
-            }
-        }
-
-        private void ParseConstructor()
-        {
-            Match matchConstructor = Regex.Match(m_fileText,
-                                                 string.Format(
-                                                     ConstructorPattern,
-                                                     Class.Name), RegexOptions.Multiline);
-
-            if (matchConstructor.Success)
-            {
-                var ctor = BuildMethodInfoFromMatch(matchConstructor, true);
-                ctor.Statements = BuildMethodElementsFromMatch(matchConstructor).ToList();
-
-                Constructors.Add(ctor);
             }
         }
 
@@ -146,55 +114,44 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
         {
             Fields = new List<FieldInfo>();
 
-            Match matchConst = Regex.Match(m_fileText,
-                                           ConstFieldPattern, RegexOptions.Multiline);
+            Match matchConst = ConstFieldPattern.Match(m_fileText);
             while (matchConst.Success)
             {
                 var field = new FieldInfo
                 {
-                    Modifiers =
-                        (AccessModifiers)
-                        Enum.Parse(typeof(AccessModifiers),
-                                   matchConst.Groups["acces"].Value,
-                                   true),
+                    Modifiers = (AccessModifiers) Enum.Parse(typeof(AccessModifiers), matchConst.Groups["acces"].Value, true),
                     Name = matchConst.Groups["name"].Value,
-                    Type =
-                        matchConst.Groups["generictype"].Value == string.Empty
+                    IsProtocolField = !matchConst.Groups["name"].Value.StartsWith("_"),
+                    Type = matchConst.Groups["generictype"].Value == string.Empty
                                                    ? matchConst.Groups["type"].Value
-                                                   : "List<" + matchConst.Groups["generictype"].Value + ">",
+                                                   : $"List<{matchConst.Groups["generictype"].Value}>",
                     Value = matchConst.Groups["value"].Value.Replace("=", "").Trim(),
                     IsConst = true,
                     IsStatic = matchConst.Groups["static"].Value != string.Empty,
                 };
-
+                
                 Fields.Add(field);
 
                 matchConst = matchConst.NextMatch();
             }
 
-            Match matchVar = Regex.Match(m_fileText,
-                                         FieldPattern, RegexOptions.Multiline);
+            Match matchVar = FieldPattern.Match(m_fileText);
             while (matchVar.Success)
             {
                 var field = new FieldInfo
                 {
-                    Modifiers =
-                        (AccessModifiers)
-                        Enum.Parse(typeof(AccessModifiers), matchVar.Groups["acces"].Value,
-                                   true),
+                    Modifiers = (AccessModifiers) Enum.Parse(typeof(AccessModifiers), matchVar.Groups["acces"].Value, true),
                     Name = matchVar.Groups["name"].Value,
+                    IsProtocolField = !matchVar.Groups["name"].Value.StartsWith("_"),
                     Type = matchVar.Groups["type"].Value,
-                    Value = matchVar.Groups["value"].Value.Replace("=", "").Trim(),
+                    Value = matchVar.Groups["value"].Value.Trim(),
                     IsStatic = matchConst.Groups["static"].Value != string.Empty
                 };
 
-                if (field.Name == "idAccessors")
+                if (field.Name != "idAccessors")
                 {
-                    matchVar = matchVar.NextMatch();
-                    continue;
+                    Fields.Add(field);
                 }
-
-                Fields.Add(field);
 
                 matchVar = matchVar.NextMatch();
             }
@@ -205,8 +162,7 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             Methods = new List<MethodInfo>();
             Properties = new List<PropertyInfo>();
 
-            Match matchMethods = Regex.Match(m_fileText,
-                                             MethodPattern, RegexOptions.Multiline);
+            Match matchMethods = MethodPattern.Match(m_fileText);
 
             while (matchMethods.Success)
             {
@@ -230,10 +186,7 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
         {
             var method = new MethodInfo
             {
-                AccessModifier =
-                    (AccessModifiers)
-                    Enum.Parse(typeof(AccessModifiers),
-                               match.Groups["acces"].Value, true),
+                AccessModifier = (AccessModifiers) Enum.Parse(typeof(AccessModifiers), match.Groups["acces"].Value, true),
                 Name = match.Groups["name"].Value,
                 Modifiers = match.Groups["override"].Value == "override"
                                 ? new List<MethodInfo.MethodModifiers>(new[] { MethodInfo.MethodModifiers.Override })
@@ -254,7 +207,7 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
                 {
                     string generictype = argStr.Split('<').Last().Split('>').First().Split('.').Last();
 
-                    arg.Type = "List<" + generictype + ">";
+                    arg.Type = $"List<{generictype}>";
                 }
                 else
                     arg.Type = argStr.Split(':').Last().Split('.').Last().Trim();
@@ -277,21 +230,12 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
 
             if (!string.IsNullOrEmpty(match.Groups["prop"].Value))
             {
-                PropertyInfo property;
-
-                IEnumerable<PropertyInfo> propertiesExisting;
-                if ((propertiesExisting = Properties.Where(entry => entry.Name == method.Name)).Count() > 0)
+                var foundProperty = Properties.FirstOrDefault(entry => entry.Name == method.Name);
+                PropertyInfo property = foundProperty ?? new PropertyInfo
                 {
-                    property = propertiesExisting.First();
-                }
-                else
-                {
-                    property = new PropertyInfo
-                    {
-                        Name = method.Name,
-                        AccessModifier = method.AccessModifier,
-                    };
-                }
+                    Name = method.Name,
+                    AccessModifier = method.AccessModifier,
+                };
 
                 if (match.Groups["prop"].Value == "get")
                 {
@@ -302,6 +246,8 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
                 {
                     property.MethodSet = method;
                 }
+                if (foundProperty == null)
+                    Properties.Add(property);
             }
 
             return method;
@@ -322,17 +268,17 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             return ParseMethodExecutions(methodlines);
         }
 
-        private static Dictionary<int, int> FindBracketsIndexesByLines(string[] lines, char startDelimter, char endDelemiter)
+        private static Dictionary<int, int> FindBracketsIndexesByLines(string[] lines, char startDelimiter, char endDelimiter)
         {
             var elementsStack = new Stack<int>();
             var result = new Dictionary<int, int>();
 
             for (int i = 0; i < lines.Length; i++)
             {
-                if (lines[i].Contains(startDelimter))
+                if (lines[i].Contains(startDelimiter))
                     elementsStack.Push(i);
 
-                if (lines[i].Contains(endDelemiter))
+                if (lines[i].Contains(endDelimiter))
                 {
                     int index = elementsStack.Pop();
 
@@ -343,7 +289,7 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
             if (elementsStack.Count > 0)
                 foreach (int i in elementsStack)
                 {
-                    throw new Exception(string.Format("Bracket '{0}' at index ", startDelimter) + i + " is not closed");
+                    throw new Exception($"Bracket '{startDelimiter}' at index " + i + " is not closed");
                 }
 
             return result;
@@ -353,129 +299,83 @@ namespace AmaknaProxy.ProtocolBuilder.Parsing
         {
             var result = new List<IStatement>();
 
-            int controlsequenceDepth = 0;
+            int blockDepth = 0;
             foreach (string line in lines.Select(entry => entry.Trim()))
             {
                 try
                 {
-                    if (IsLineIgnored(line))
-                        continue;
-
-                    if (line == "{" || line.Contains("for(") || line.Contains("for ("))
+                    if (IsLineIgnored(line) || line == "{")
                         continue;
 
                     if (line == "}")
                     {
-                        if (controlsequenceDepth > 0)
+                        if (blockDepth > 0)
                         {
                             result.Add(new ControlStatementEnd());
-                            controlsequenceDepth--;
+                            blockDepth--;
                         }
-
                         continue;
                     }
-
-                    IStatement statement;
-
-                    if (Regex.IsMatch(line, ControlStatement.Pattern))
+                    
+                    if (ControlStatement.TryParse(line) is { } controlStatement)
                     {
-                        statement = ControlStatement.Parse(line);
-                        controlsequenceDepth++;
+                        blockDepth++;
+                        result.Add(controlStatement);
                     }
-
-                    else if (Regex.IsMatch(line, AssignationStatement.Pattern))
+                    else if (ForStatement.TryParse(line) is { } forStatement)
                     {
-                        statement = AssignationStatement.Parse(line);
+                        blockDepth++;
+                        result.Add(forStatement);
                     }
-
-                    else if (Regex.IsMatch(line, InvokeExpression.Pattern))
+                    else if (AssignationStatement.TryParse(line) is { } assignationStatement)
                     {
-                        statement = InvokeExpression.Parse(line);
-                        if (!string.IsNullOrEmpty((statement as InvokeExpression).ReturnVariableAssignation) &&
-                            string.IsNullOrEmpty((statement as InvokeExpression).Preffix) &&
-                            Fields.Count(entry => entry.Name == ((InvokeExpression)statement).ReturnVariableAssignation) > 0)
+                        result.Add(assignationStatement);
+                    }
+                    else if (InvokeExpression.TryParse(line) is { } invokeStatement)
+                    {
+                        if (!string.IsNullOrEmpty(invokeStatement.ReturnVariableAssignation) && string.IsNullOrEmpty(invokeStatement.Preffix))
                         {
-                            (statement as InvokeExpression).Preffix = "(" +
-                                                                     Fields.Where(
-                                                                         entry =>
-                                                                         entry.Name ==
-                                                                         ((InvokeExpression)statement).
-                                                                             ReturnVariableAssignation).First().Type + ")"; // cast
+                            var field = Fields.FirstOrDefault(entry => entry.Name == invokeStatement.ReturnVariableAssignation);
+                            if (field != null)
+                            {
+                                invokeStatement.Preffix = $"({field.Type})";
+                            }
                         }
-
-                        // cast to generic type
-                        if (!string.IsNullOrEmpty((statement as InvokeExpression).Target) &&
-                            (statement as InvokeExpression).Name == "Add" &&
-                            Fields.Count(entry => entry.Name == ((InvokeExpression)statement).Target.Split('.').Last()) > 0)
-                        {
-                            string generictype =
-                                Fields.Where(entry => entry.Name == ((InvokeExpression)statement).Target.Split('.').Last()).
-                                    First().Type.Split('<').Last().Split('>').First();
-
-                            (statement as InvokeExpression).Args[0] = "(" + generictype + ")" +
-                                                                  (statement as InvokeExpression).Args[0];
-                        }
-                    }
-
-                    else
-                        statement = new UnknownStatement
+                        result.Add(invokeStatement);
+                    } else {
+                        result.Add(new UnknownStatement
                         {
                             Value = line
-                        };
-
-                    result.Add(statement);
-                }
-                catch (Exception)
-                {
-                    continue;
+                        });
+                    }
+                } catch (Exception e) {
+                    Console.Error.WriteLine($"Error while parsing line '{line}' for '{Class.Name}': {e.Message}");
                 }
             }
 
             return result;
         }
 
-        private string GetMatch(string pattern, int index = 1)
-        {
-            var matchedLine = m_fileLines.Where(entry => Regex.IsMatch(entry, pattern, RegexOptions.Multiline)).FirstOrDefault();
-
-            if (matchedLine == null)
-                return "";
-
-            Match match = Regex.Match(matchedLine, pattern, RegexOptions.Multiline);
-
-            return match.Groups[index].Value;
-        }
-
-        private static string ApplyRules(IEnumerable<KeyValuePair<string, string>> rules, string str)
-        {
+        private static string ApplyRules(IEnumerable<KeyValuePair<string, string>> rules, string str) {
             if (rules == null)
                 return str;
 
             if (string.IsNullOrEmpty(str))
                 return str;
 
-            foreach (var rule in rules)
-            {
-                var replace = Regex.Replace(str, rule.Key, rule.Value);
-
-                str = replace;
+            foreach (var rule in rules) {
+                str = Regex.Replace(str, rule.Key, rule.Value);
             }
 
             return str;
         }
 
-        private bool IsLineIgnored(string line)
-        {
+        private bool IsLineIgnored(string line) {
             return IgnoredLines != null && IgnoredLines.Any(rule => Regex.IsMatch(line, rule));
         }
     }
 
-    public class InvalidCodeFileException : Exception
-    {
-        public InvalidCodeFileException(string thisFileDoesNotContainAClass)
-            : base(thisFileDoesNotContainAClass)
-        {
-
-        }
+    public class InvalidCodeFileException : Exception {
+        public InvalidCodeFileException(string message) : base(message) { }
     }
 }

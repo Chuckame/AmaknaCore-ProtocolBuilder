@@ -1,6 +1,6 @@
 using System.Xml.Serialization;
 
-namespace AmaknaProxy.ProtocolBuilder.XmlPatterns
+namespace ProtocolBuilder.XmlPatterns
 {
     public class XmlField
     {
@@ -12,21 +12,70 @@ namespace AmaknaProxy.ProtocolBuilder.XmlPatterns
         }
 
         [XmlAttribute]
-        public string Type
+        public string WriteType
         {
             get;
             set;
         }
 
         [XmlAttribute]
-        public string Limit
+        public string ReadType
         {
             get;
             set;
         }
+
+        [XmlAttribute]
+        public bool IsArray
+        {
+            get;
+            set;
+        }
+
+        [XmlAttribute]
+        public string ArrayLengthReadType
+        {
+            get;
+            set;
+        }
+
+        [XmlAttribute]
+        public string ArrayLengthWriteType
+        {
+            get;
+            set;
+        }
+
+        [XmlAttribute]
+        public bool IsStaticType
+        {
+            get;
+            set;
+        }
+
+        [XmlAttribute]
+        public bool IsPolymorphicType
+        {
+            get;
+            set;
+        }
+
+        [XmlAttribute]
+        public int FlagIndex
+        {
+            get;
+            set;
+        } = -1;
 
         [XmlAttribute]
         public string Condition
+        {
+            get;
+            set;
+        }
+        
+        [XmlIgnore]
+        public bool IsGuessedField
         {
             get;
             set;

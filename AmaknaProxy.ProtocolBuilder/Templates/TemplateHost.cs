@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TextTemplating;
 
-namespace AmaknaProxy.ProtocolBuilder.Templates
+namespace ProtocolBuilder.Templates
 {
     public class TemplateHost : ITextTemplatingEngineHost, ITextTemplatingSessionHost
     {
